@@ -30,13 +30,13 @@
   },
   "types": "./typings/index.d.ts",
   "dependencies": {
-    "@types/node": "^12.0.4",
     "debug": "^4.0.1",
     "node-fetch": "^2.2.0",
     "sandwich-stream": "^2.0.1",
     "telegram-typings": "^3.6.0"
   },
   "devDependencies": {
+    "@types/node": "^12.7.8",
     "ava": "^2.2.0",
     "eslint": "^6.2.2",
     "eslint-config-standard": "^14.1.0",

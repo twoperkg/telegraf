@@ -1250,6 +1250,27 @@ export class Extra {
   static markdown(value?: boolean): Extra;
 }
 
+export const Router: RouterConstructor
+
+export interface Router<TContext extends RouterContextMessageUpdate> extends Middleware<TContext> {
+
+on(route:string, ...middlewares: Array<Middleware<TContext>>) : Router<TContext>
+
+otherwise(...middlewares: Array<Middleware<TContext>>) : Router<TContext>
+
+middleware() : Promise<any>
+
+}
+
+export interface RouterContextMessageUpdate extends ContextMessageUpdate {
+  state: object
+}
+
+export interface RouterConstructor {
+  new <TContext extends RouterContextMessageUpdate> (routeFn : Middleware<TContext>, handlers?: Map<string,Middleware<TContext>>) : Router<TContext>
+}
+
+
 export interface BaseSceneOptions<TContext extends SceneContextMessageUpdate> {
   handlers: Middleware<TContext>[];
   enterHandlers: Middleware<TContext>[];

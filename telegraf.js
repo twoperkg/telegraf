@@ -9,6 +9,7 @@ const Stage = require('./stage')
 const BaseScene = require('./scenes/base')
 const Context = require('./core/context')
 const generateCallback = require('./core/network/webhook')
+const WizardScene = require('./scenes/wizard')
 const crypto = require('crypto')
 const { URL } = require('url')
 
@@ -215,5 +216,6 @@ module.exports.default = Object.assign(Telegraf, {
   Telegram,
   Stage,
   BaseScene,
-  session
+  session,
+  WizardScene
 })

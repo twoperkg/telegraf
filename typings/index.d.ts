@@ -1271,6 +1271,68 @@ export interface RouterConstructor {
 }
 
 
+export interface WizardSceneOptions<TContext extends WizardContextMessageUpdate> {
+  handlers: Middleware<TContext>[];
+  enterHandlers: Middleware<TContext>[];
+  leaveHandlers: Middleware<TContext>[];
+  ttl?: number;
+}
+
+
+
+export interface WizardContext<TContext extends WizardContextMessageUpdate>  {
+
+  ctx: TContext
+
+  steps: Middleware<TContext>[] | Composer<TContext>[]
+
+  state: object
+
+  cursor: number
+
+  readonly step: Middleware<TContext>
+
+  selectStep: (index: number) => this
+
+  next: () => this
+
+  back: () => this
+
+
+
+}
+
+export interface WizardContextMessageUpdate extends SceneContextMessageUpdate {
+  wizard: WizardContext<this>
+}
+
+export class WizardScene<TContext extends WizardContextMessageUpdate> extends Composer<TContext> {
+   constructor(id: string, options?: Partial<WizardSceneOptions<TContext>>, ...steps: Array<Middleware<TContext> | Composer<TContext>>)
+
+  id: string
+
+  options: WizardSceneOptions<TContext>
+
+  ttl?: number
+
+  enterHandler: Middleware<TContext>;
+
+  leaveHandler: Middleware<TContext>;
+
+  leave: (...fns: Middleware<TContext>[]) => this
+
+  leaveMiddleware: () => Middleware<TContext>;
+
+  middleware: () => Middleware<TContext>;
+
+  enterMiddleware: () => Middleware<TContext>;
+
+  enter: (...fns: Middleware<TContext>[]) => this;
+
+
+}
+
+
 export interface BaseSceneOptions<TContext extends SceneContextMessageUpdate> {
   handlers: Middleware<TContext>[];
   enterHandlers: Middleware<TContext>[];

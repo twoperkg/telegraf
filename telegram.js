@@ -176,7 +176,7 @@ class Telegram extends ApiClient {
   }
 
   answerInlineQuery (inlineQueryId, results, extra) {
-    return this.callApi('answerInlineQuery', { inline_query_id: inlineQueryId, results: JSON.stringify(results), ...extra })
+    return this.callApi('answerInlineQuery', { inline_query_id: inlineQueryId, results, ...extra })
   }
 
   setChatPermissions (chatId, permissions) {
@@ -380,6 +380,13 @@ class Telegram extends ApiClient {
 
   deleteStickerFromSet (sticker) {
     return this.callApi('deleteStickerFromSet', { sticker })
+  }
+
+  setPassportDataErrors (userId, errors) {
+    return this.callApi('setPassportDataErrors', {
+      user_id: userId,
+      errors: errors
+    })
   }
 
   sendCopy (chatId, message, extra) {

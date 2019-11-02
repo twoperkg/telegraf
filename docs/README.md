@@ -1,17 +1,10 @@
-## telegraf.js
+![Telegraf](header.png)
 
-Modern Telegram bot framework.
+## Introduction
 
 Bots are special [Telegram](https://telegram.org) accounts designed to handle messages automatically. 
 Users can interact with bots by sending them command messages in private or group chats. 
 These accounts serve as an interface for code running somewhere on your server.
-
-![Telegraf](header.png)
-[![Bot API Version](https://img.shields.io/badge/Bot%20API-v4.4-f36caf.svg?style=flat-square)](https://core.telegram.org/bots/api)
-[![NPM Version](https://img.shields.io/npm/v/telegraf.svg?style=flat-square)](https://www.npmjs.com/package/telegraf)
-[![node](https://img.shields.io/node/v/telegraf.svg?style=flat-square)](https://www.npmjs.com/package/telegraf)
-[![Build Status](https://img.shields.io/travis/telegraf/telegraf.svg?branch=master&style=flat-square)](https://travis-ci.org/telegraf/telegraf)
-[![js-standard-style](https://img.shields.io/badge/code%20style-standard-brightgreen.svg?style=flat-square)](http://standardjs.com/)
 
 #### Features
 
@@ -49,7 +42,6 @@ bot.on('sticker', (ctx) => ctx.reply('👍'))
 bot.hears('hi', (ctx) => ctx.reply('Hey there'))
 bot.launch()
 ```
-
 
 ```js
 const Telegraf = require('telegraf')
@@ -97,9 +89,10 @@ For additional bot examples see [`examples`](https://github.com/telegraf/telegra
 * [yt-search-bot](https://github.com/Finalgalaxy/yt-search-bot)
 * [YTubevideoBot](https://github.com/n1ghtw0lff/YTubevideoBot)
 * [Google it Bot: Instant Inline Search](https://github.com/Edgar-P-yan/google-it-telegram-bot)
+* [TereGramBot](https://github.com/juandjara/TereGramBot)
 * Send PR to add link to your bot
 
-## Introduction
+## Getting started
 
 #### Telegram token
 
@@ -129,29 +122,15 @@ It returns a Promise with a then function for running code after completion.
 ```js
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
-bot.use((ctx, next) => {
-  const start = new Date()
-  return next(ctx).then(() => {
-    const ms = new Date() - start
-    console.log('Response time %sms', ms)
-  })
-})
-
-bot.on('text', (ctx) => ctx.reply('Hello World'))
-bot.launch()
-```
-
-##### Cascading with async functions
-
-You might need Babel or `node >=v.7.x` with harmony flags or `@std/esm` package for running following example.
-
-```js
 bot.use(async (ctx, next) => {
   const start = new Date()
   await next()
   const ms = new Date() - start
-  console.log('Response time %sms', ms)
+  console.log('Response time: %sms', ms)
 })
+
+bot.on('text', (ctx) => ctx.reply('Hello World'))
+bot.launch()
 ```
 
 ##### Known middleware
@@ -170,14 +149,14 @@ bot.use(async (ctx, next) => {
 
 #### Error handling
 
-By default Telegraf will print all errors to stderr and rethrow error.
+By default Telegraf will print all errors to `stderr` and rethrow error.
 
 To perform custom error-handling logic use following snippet:
 
 ```js
 const bot = new Telegraf(process.env.BOT_TOKEN)
-bot.catch((err) => {
-  console.log('Ooops', err)
+bot.catch((err, ctx) => {
+  console.log(`Ooops, encountered an error for ${ctx.updateType}`, err)
 })
 bot.start((ctx) => ctx.reply(42/0))
 bot.launch()
@@ -272,6 +251,7 @@ Context shortcuts for **message** update:
 * `setStickerPositionInSet` -> [`telegram.setStickerPositionInSet`](#setstickerpositioninset)
 * `unpinChatMessage`        -> [`telegram.unpinChatMessage`](#unpinchatmessage)
 * `uploadStickerFile`       -> [`telegram.uploadStickerFile`](#uploadstickerfile)
+* `setPassportDataErrors`   -> [`telegram.setPassportDataErrors`](#setpassportdataerrors)
 
 Context shortcuts for **callback_query** update:
 
@@ -341,7 +321,7 @@ bot.command('quit', (ctx) => {
   // Explicit usage
   ctx.telegram.leaveChat(ctx.message.chat.id)
 
-  // Using shortcut
+  // Using context shortcut
   ctx.leaveChat()
 })
 
@@ -349,7 +329,7 @@ bot.on('text', (ctx) => {
   // Explicit usage
   ctx.telegram.sendMessage(ctx.message.chat.id, `Hello ${ctx.state.role}`)
 
-  // Using shortcut
+  // Using context shortcut
   ctx.reply(`Hello ${ctx.state.role}`)
 })
 
@@ -357,7 +337,7 @@ bot.on('callback_query', (ctx) => {
   // Explicit usage
   ctx.telegram.answerCbQuery(ctx.callbackQuery.id)
 
-  // Using shortcut
+  // Using context shortcut
   ctx.answerCbQuery()
 })
 
@@ -366,7 +346,7 @@ bot.on('inline_query', (ctx) => {
   // Explicit usage
   ctx.telegram.answerInlineQuery(ctx.inlineQuery.id, result)
 
-  // Using shortcut
+  // Using context shortcut
   ctx.answerInlineQuery(result)
 })
 
@@ -409,7 +389,7 @@ bot.on('text', (ctx) => {
 bot.launch()
 ```
 
-**Note: For persistent sessions you might use any of [`telegraf-session-*`](https://www.npmjs.com/search?q=telegraf-session) middleware.**
+**Note: For persistent sessions you can use any of [`telegraf-session-*`](https://www.npmjs.com/search?q=telegraf-session) middleware.**
 
 **Tip: To use same session in private chat with bot and in inline mode, use following session key resolver:**
 
@@ -470,6 +450,7 @@ Available update sub-types:
 - `successful_payment`
 - `connected_website`
 - `passport_data`
+- `poll`
 
 ```js
 // Handle message update
@@ -579,10 +560,17 @@ bot.telegram.setWebhook('https://server.tld:8443/secret-path')
 
 const app = new Koa()
 app.use(koaBody())
-app.use((ctx, next) => ctx.method === 'POST' || ctx.url === '/secret-path'
-  ? bot.handleUpdate(ctx.request.body, ctx.response)
-  : next()
-)
+app.use(async (ctx, next) => {
+  if (ctx.method !== 'POST' || ctx.url !== '/secret-path') {
+    return next()
+  }
+  await bot.handleUpdate(ctx.request.body, ctx.response)
+  ctx.status = 200
+})
+app.use(async (ctx) => {
+  ctx.body = 'Hello World'
+})
+
 app.listen(3000)
 ```
 
@@ -624,6 +612,26 @@ bot.on('message', (ctx) => {
     url: 'https://picsum.photos/200/300/?random',
     filename: 'kitten.jpg'
   })
+})
+```
+
+#### Telegram Passport
+
+To enable Telegram Passport support you can use [`telegram-passport`](https://www.npmjs.com/package/telegram-passport) package:
+
+```js
+const Telegraf = require('telegraf')
+const TelegramPassport = require('telegram-passport')
+
+const bot = new Telegraf(process.env.BOT_TOKEN)
+const passport = new TelegramPassport("PRIVATE_KEY_IN_PEM_FORMAT")
+
+bot.on('passport_data', (ctx) => {
+  const decryptedPasswordData = passport.decrypt(ctx.passportData)
+  console.log(decryptedPasswordData)
+  return ctx.setPassportDataErrors([
+    { source: 'selfie', type: 'driver_license', file_hash: 'file-hash', message: 'Selfie photo is too low quality'}
+  ])
 })
 ```
 
@@ -869,7 +877,7 @@ Start poll updates.
 | --- | --- | --- | --- |
 | [timeout] | `number` | 30 | Poll timeout in seconds |
 | [limit] | `number` | 100 | Limits the number of updates to be retrieved |
-| [allowedUpdates] | `string[]` | null | List the types of updates you want your bot to receive |
+| [allowedUpdates] | `string[]/string/null` | null | List the types of updates you want your bot to receive |
 | [stopCallback] | `function` | null | Polling stop callback |
 
 ##### startWebhook
@@ -989,6 +997,17 @@ Generates optional middleware.
 | Param | Type | Description |
 | --- | --- | --- |
 | test | `truthy/function` | Value or predicate `(ctx) => bool` |
+| middleware | `function` | middleware |
+
+##### Telegraf.acl
+
+Generates middleware for provided users only.
+
+`Telegraf.acl(userId, ...middleware) => function`
+
+| Param | Type | Description |
+| --- | --- | --- |
+| userId | `string/string[]` | User id |
 | middleware | `function` | middleware |
 
 ##### Telegraf.drop
@@ -1934,6 +1953,20 @@ Use this method to unban a previously kicked user in a supergroup.
 | --- | --- | --- |
 | chatId | `number/string` | Chat id |
 | userId | `number` | User id |
+
+
+##### setPassportDataErrors
+
+Informs a user that some of the Telegram Passport elements they provided contains errors. 
+The user will not be able to re-submit their Passport to you 
+until the errors are fixed (the contents of the field for which you returned the error must change).
+
+`telegram.setPassportDataErrors(errors) => Promise`
+[Official documentation](https://core.telegram.org/bots/api#setpassportdataerrors)
+
+| Param | Type | Description |
+| ---  | --- | --- |
+| [errors] | `PassportElementError[]` | An array describing the errors |
 
 #### Extra
 

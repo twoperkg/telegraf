@@ -3,10 +3,28 @@ const crypto = require('crypto')
 const fetch = require('node-fetch').default
 const fs = require('fs')
 const https = require('https')
+const http = require('http')
 const path = require('path')
 const TelegramError = require('./error')
 const MultipartStream = require('./multipart-stream')
 const { isStream } = MultipartStream
+
+const httpAgent = new http.Agent({
+  keepAlive: true
+})
+const httpsAgent = new https.Agent({
+  keepAlive: true
+})
+
+const options = {
+  agent: function (_parsedURL) {
+    if (_parsedURL.protocol === 'http:') {
+      return httpAgent
+    } else {
+      return httpsAgent
+    }
+  }
+}
 
 const WEBHOOK_BLACKLIST = [
   'getChat',
@@ -46,7 +64,7 @@ const WEBHOOK_REPLY_STUB = {
   details: 'https://core.telegram.org/bots/api#making-requests-when-getting-updates'
 }
 
-function safeJSONParse (text) {
+function safeJSONParse(text) {
   try {
     return JSON.parse(text)
   } catch (err) {
@@ -54,7 +72,7 @@ function safeJSONParse (text) {
   }
 }
 
-function includesMedia (payload) {
+function includesMedia(payload) {
   return Object.keys(payload).some(
     (key) => {
       const value = payload[key]
@@ -70,7 +88,7 @@ function includesMedia (payload) {
   )
 }
 
-function buildJSONConfig (payload) {
+function buildJSONConfig(payload) {
   return Promise.resolve({
     method: 'POST',
     compress: true,
@@ -79,7 +97,7 @@ function buildJSONConfig (payload) {
   })
 }
 
-function buildFormDataConfig (payload) {
+function buildFormDataConfig(payload) {
   if (payload.reply_markup && typeof payload.reply_markup !== 'string') {
     payload.reply_markup = JSON.stringify(payload.reply_markup)
   }
@@ -96,7 +114,7 @@ function buildFormDataConfig (payload) {
   })
 }
 
-function attachFormValue (form, id, value) {
+function attachFormValue(form, id, value) {
   if (!value) {
     return Promise.resolve()
   }
@@ -145,10 +163,10 @@ function attachFormValue (form, id, value) {
   return attachFormMedia(form, value, id)
 }
 
-function attachFormMedia (form, media, id) {
+function attachFormMedia(form, media, id) {
   let fileName = media.filename || `${id}.${DEFAULT_EXTENSIONS[id] || 'dat'}`
   if (media.url) {
-    return fetch(media.url).then((res) =>
+    return fetch(media.url, { agent: options.agent }).then((res) =>
       form.addPart({
         headers: { 'content-disposition': `form-data; name="${id}"; filename="${fileName}"` },
         body: res.body
@@ -170,11 +188,11 @@ function attachFormMedia (form, media, id) {
   return Promise.resolve()
 }
 
-function isKoaResponse (response) {
+function isKoaResponse(response) {
   return typeof response.set === 'function' && typeof response.header === 'object'
 }
 
-function answerToWebhook (response, payload = {}) {
+function answerToWebhook(response, payload = {}) {
   if (!includesMedia(payload)) {
     if (isKoaResponse(response)) {
       response.body = payload
@@ -206,7 +224,7 @@ function answerToWebhook (response, payload = {}) {
 }
 
 class ApiClient {
-  constructor (token, options, webhookResponse) {
+  constructor(token, options, webhookResponse) {
     this.token = token
     this.options = {
       ...DEFAULT_OPTIONS,
@@ -218,15 +236,15 @@ class ApiClient {
     this.response = webhookResponse
   }
 
-  set webhookReply (enable) {
+  set webhookReply(enable) {
     this.options.webhookReply = enable
   }
 
-  get webhookReply () {
+  get webhookReply() {
     return this.options.webhookReply
   }
 
-  callApi (method, data = {}) {
+  callApi(method, data = {}) {
     const { token, options, response, responseEnd } = this
 
     const payload = Object.keys(data)

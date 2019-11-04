@@ -97,13 +97,23 @@ function buildJSONConfig(payload) {
   })
 }
 
-function buildFormDataConfig(payload) {
-  if (payload.reply_markup && typeof payload.reply_markup !== 'string') {
-    payload.reply_markup = JSON.stringify(payload.reply_markup)
+const FORM_DATA_JSON_FIELDS = [
+  'results',
+  'reply_markup',
+  'mask_position',
+  'shipping_options',
+  'errors'
+]
+
+function buildFormDataConfig (payload, agent) {
+  for (const field of FORM_DATA_JSON_FIELDS) {
+    if (field in payload && typeof payload[field] !== 'string') {
+      payload[field] = JSON.stringify(payload[field])
+    }
   }
   const boundary = crypto.randomBytes(32).toString('hex')
   const formData = new MultipartStream(boundary)
-  const tasks = Object.keys(payload).map((key) => attachFormValue(formData, key, payload[key]))
+  const tasks = Object.keys(payload).map((key) => attachFormValue(formData, key, payload[key], agent))
   return Promise.all(tasks).then(() => {
     return {
       method: 'POST',
@@ -114,7 +124,7 @@ function buildFormDataConfig(payload) {
   })
 }
 
-function attachFormValue(form, id, value) {
+function attachFormValue (form, id, value, agent) {
   if (!value) {
     return Promise.resolve()
   }
@@ -128,7 +138,7 @@ function attachFormValue(form, id, value) {
   }
   if (id === 'thumb') {
     const attachmentId = crypto.randomBytes(16).toString('hex')
-    return attachFormMedia(form, value, attachmentId)
+    return attachFormMedia(form, value, attachmentId, agent)
       .then(() => form.addPart({
         headers: { 'content-disposition': `form-data; name="${id}"` },
         body: `attach://${attachmentId}`
@@ -141,7 +151,7 @@ function attachFormValue(form, id, value) {
           return Promise.resolve(item)
         }
         const attachmentId = crypto.randomBytes(16).toString('hex')
-        return attachFormMedia(form, item.media, attachmentId)
+        return attachFormMedia(form, item.media, attachmentId, agent)
           .then(() => ({ ...item, media: `attach://${attachmentId}` }))
       })
     ).then((items) => form.addPart({
@@ -151,7 +161,7 @@ function attachFormValue(form, id, value) {
   }
   if (typeof value.media !== 'undefined' && typeof value.type !== 'undefined') {
     const attachmentId = crypto.randomBytes(16).toString('hex')
-    return attachFormMedia(form, value.media, attachmentId)
+    return attachFormMedia(form, value.media, attachmentId, agent)
       .then(() => form.addPart({
         headers: { 'content-disposition': `form-data; name="${id}"` },
         body: JSON.stringify({
@@ -160,7 +170,7 @@ function attachFormValue(form, id, value) {
         })
       }))
   }
-  return attachFormMedia(form, value, id)
+  return attachFormMedia(form, value, id, agent)
 }
 
 function attachFormMedia(form, media, id) {
@@ -192,7 +202,7 @@ function isKoaResponse(response) {
   return typeof response.set === 'function' && typeof response.header === 'object'
 }
 
-function answerToWebhook(response, payload = {}) {
+function answerToWebhook (response, payload = {}, options) {
   if (!includesMedia(payload)) {
     if (isKoaResponse(response)) {
       response.body = payload
@@ -201,12 +211,16 @@ function answerToWebhook(response, payload = {}) {
     if (!response.headersSent) {
       response.setHeader('content-type', 'application/json')
     }
-    return new Promise((resolve) =>
+    return new Promise((resolve) => {
+      if (response.end.length === 2) {
+        response.end(JSON.stringify(payload), 'utf-8')
+        return resolve(WEBHOOK_REPLY_STUB)
+      }
       response.end(JSON.stringify(payload), 'utf-8', () => resolve(WEBHOOK_REPLY_STUB))
-    )
+    })
   }
 
-  return buildFormDataConfig(payload)
+  return buildFormDataConfig(payload, options.agent)
     .then(({ headers, body }) => {
       if (isKoaResponse(response)) {
         Object.keys(headers).forEach(key => response.set(key, headers[key]))
@@ -254,7 +268,7 @@ class ApiClient {
     if (options.webhookReply && response && !responseEnd && !WEBHOOK_BLACKLIST.includes(method)) {
       debug('Call via webhook', method, payload)
       this.responseEnd = true
-      return answerToWebhook(response, { method, ...payload })
+      return answerToWebhook(response, { method, ...payload }, options)
     }
 
     if (!token) {
@@ -263,7 +277,7 @@ class ApiClient {
 
     debug('HTTP call', method, payload)
     const buildConfig = includesMedia(payload)
-      ? buildFormDataConfig({ method, ...payload })
+      ? buildFormDataConfig({ method, ...payload }, options.agent)
       : buildJSONConfig(payload)
     return buildConfig
       .then((config) => {
